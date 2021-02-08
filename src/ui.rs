@@ -1,13 +1,20 @@
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContext, EguiSettings};
+use egui::Pos2;
 
-use super::player::Player;
 use super::common_components::*;
+use super::player::Player;
 
-pub fn ui_windows(mut egui_context: ResMut<EguiContext>, q_player: Query<(&Player, &Position, &Inventory)>) {
+pub fn ui_windows(
+    mut egui_context: ResMut<EguiContext>,
+    mut egui_settings: ResMut<EguiSettings>,
+    mut q_player: Query<(&mut Player, &Position, &mut Inventory)>,
+    windows: Res<Windows>,
+    mut ev_inventory_button: ResMut<Events<InventoryButtonEvent>>,
+) {
     let ctx = &mut egui_context.ctx;
 
-    for (player, pos, inventory) in q_player.iter() {
+    for (player, pos, inventory) in q_player.iter_mut() {
         let player_name = format!("{}", player.name);
         let pos = format!("x:{} - y:{}", pos.x, pos.y);
         let health = format!("Health: {}", (player.health as i32).to_string());
@@ -24,123 +31,63 @@ pub fn ui_windows(mut egui_context: ResMut<EguiContext>, q_player: Query<(&Playe
         });
 
         egui::Window::new("Inventory").show(ctx, |ui| {
-            for (item, qty) in inventory.items.iter() {            
-            ui.label(format!("{}: {}", item.name, qty));
+            for (item, qty) in inventory.items.iter() {
+                match item {
+                    ItemType::Water { name, consume: _ } => {
+                        if ui.button(format!("{}: {}", name, qty)).clicked {
+                            ev_inventory_button.send(InventoryButtonEvent(item.clone()));
+                        };
+                    }
+                    ItemType::Wood { name } => {
+                        if ui.button(format!("{}: {}", name, qty)).clicked {};
+                    }
+                }
+
+                // ui.label(format!("{}: {}", item.name, qty));
             }
         });
+
+        egui::Window::new("Settings")
+            .default_pos(Pos2 {
+                x: windows.get_primary().unwrap().width() - 140.0,
+                y: 15.0,
+            })
+            .show(ctx, |ui| {
+                ui.heading("Scale");
+                if ui.button("Increase").clicked {
+                    egui_settings.scale_factor += 0.5;
+                } else if ui.button("Decrease").clicked && egui_settings.scale_factor > 1.0 {
+                    egui_settings.scale_factor -= 0.5;
+                }
+            });
     }
 }
 
-// use bevy::prelude::*;
-// use bevy_megaui::{
-//     megaui::{hash, Vector2},
-//     MegaUiContext,
-// };
+#[derive(Default)]
+pub struct InventoryButtonEventListenerState {
+    my_event_reader: EventReader<InventoryButtonEvent>,
+}
+// #[derive(Default)]
+pub struct InventoryButtonEvent(pub ItemType);
 
-// use super::player::Player;
+pub fn inventory_button_event(
+    events: Res<Events<InventoryButtonEvent>>,
+    mut event_listener_state: ResMut<InventoryButtonEventListenerState>,
+    mut q_player: Query<(&mut Player, &mut Inventory)>,
+) {
+    for ev in event_listener_state.my_event_reader.iter(&events) {
+        for (mut player, mut inventory) in q_player.iter_mut() {
+            if player.consume_item(&ev.0) {
+                // let item = inventory.items.entry(ev.0.clone()).borrow_mut();
+                let item_count = inventory.items[&ev.0];
 
-// pub fn ui_windows(_world: &mut World, resources: &mut Resources) {
-//     let mut ui = resources.get_thread_local_mut::<MegaUiContext>().unwrap();
-
-//     let health = format!("Health: {}", 100);// player.health.to_string());
-//     let thirst = format!("Thirst: {}", 100);//player.thirst.to_string());
-//     let hunger = format!("Hunger: {}", 100);//player.hunger.to_string());
-
-//     ui.draw_window(
-//         hash!(),
-//         Vector2::new(5.0, 5.0),
-//         Vector2::new(200.0, 100.0),
-//         None,
-//         |ui| {
-//             ui.label(None, "Player stats:");
-//             ui.separator();
-//             ui.label(None, &health);
-//             ui.label(None, &thirst);
-//             ui.label(None, &hunger);
-//         },
-//     );
-// }
-
-/////////////////////////////////////////////////////////////////////////////////
-
-// struct ButtonMaterials {
-//     normal: Handle<ColorMaterial>,
-//     hovered: Handle<ColorMaterial>,
-//     pressed: Handle<ColorMaterial>,
-// }
-
-// impl FromResources for ButtonMaterials {
-//     fn from_resources(resources: &Resources) -> Self {
-//         let mut materials = resources.get_mut::<Assets<ColorMaterial>>().unwrap();
-//         ButtonMaterials {
-//             normal: materials.add(Color::rgb(0.15, 0.15, 0.15).into()),
-//             hovered: materials.add(Color::rgb(0.25, 0.25, 0.25).into()),
-//             pressed: materials.add(Color::rgb(0.35, 0.75, 0.35).into()),
-//         }
-//     }
-// }
-
-// pub fn button_system(
-//     button_materials: Res<ButtonMaterials>,
-//     mut interaction_query: Query<
-//         (&Interaction, &mut Handle<ColorMaterial>, &Children),
-//         (Mutated<Interaction>, With<Button>),
-//     >,
-//     mut text_query: Query<&mut Text>,
-// ) {
-//     for (interaction, mut material, children) in interaction_query.iter_mut() {
-//         let mut text = text_query.get_mut(children[0]).unwrap();
-//         match *interaction {
-//             Interaction::Clicked => {
-//                 // text.sections[0].value = "Press".to_string();
-//                 *material = button_materials.pressed.clone();
-//             }
-//             Interaction::Hovered => {
-//                 // text.sections[0].value = "Hover".to_string();
-//                 *material = button_materials.hovered.clone();
-//             }
-//             Interaction::None => {
-//                 // text.sections[0].value = "Button".to_string();
-//                 *material = button_materials.normal.clone();
-//             }
-//         }
-//     }
-// }
-
-// pub fn setup(
-//     commands: &mut Commands,
-//     asset_server: Res<AssetServer>,
-//     button_materials: Res<ButtonMaterials>,
-// ) {
-//     commands
-//         // ui camera
-//         .spawn(CameraUiBundle::default())
-//         .spawn(ButtonBundle {
-//             style: Style {
-//                 size: Size::new(Val::Px(150.0), Val::Px(65.0)),
-//                 // center button
-//                 margin: Rect::all(Val::Auto),
-//                 // horizontally center child text
-//                 justify_content: JustifyContent::Center,
-//                 // vertically center child text
-//                 align_items: AlignItems::Center,
-//                 ..Default::default()
-//             },
-//             material: button_materials.normal.clone(),
-//             ..Default::default()
-//         })
-//         .with_children(|parent| {
-//             parent.spawn(TextBundle {
-//                 text: Text::with_section(
-//                     "Button",
-//                     TextStyle {
-//                         font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-//                         font_size: 40.0,
-//                         color: Color::rgb(0.9, 0.9, 0.9),
-//                     },
-//                     Default::default(),
-//                 ),
-//                 ..Default::default()
-//             });
-//         });
-// }
+                if item_count == 1 {
+                    inventory.items.remove_entry(&ev.0);
+                } else {
+                    let v = inventory.items.entry(ev.0.clone()).or_insert(1);
+                    *v -= 1;
+                }
+            }
+        }
+    }
+}

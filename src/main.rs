@@ -1,23 +1,25 @@
 use bevy::{asset::LoadState, prelude::*, sprite::TextureAtlasBuilder, window::WindowMode};
+use bevy_tilemap::prelude::*;
+use sprite_tools::SpriteChangeEvent;
+use ui::{InventoryButtonEvent, InventoryButtonEventListenerState};
 use std::collections::HashMap;
 
 // use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
 
 use bevy_egui::EguiPlugin;
-use bevy_tilemap::prelude::*;
 
 mod ui;
 
 mod world;
 use world::*;
 pub mod common_components;
-use common_components::{Harvestable, Inventory, Position, Render};
+use common_components::{Attribute, Consumable, Harvestable, Inventory, Position, Render};
 mod player;
 use player::*;
 pub mod game;
 use game::*;
 pub mod sprite_tools;
-
+use sprite_tools::*;
 mod player_input;
 use player_input::*;
 
@@ -45,10 +47,13 @@ fn main() {
         .init_resource::<WorldProps>()
         .init_resource::<Player>()
         .init_resource::<MouseState>()
+        .init_resource::<SpriteChangedEventListenerState>()
+        .init_resource::<InventoryButtonEventListenerState>()
+        .add_event::<SpriteChangeEvent>()
+        .add_event::<InventoryButtonEvent>()
         // .init_resource::<player_input::InputState>()
         .add_plugins(DefaultPlugins)
         .add_plugins(TilemapDefaultPlugins)
-        // .add_plugin(MegaUiPlugin)
         .add_plugin(EguiPlugin)
         .add_startup_system(setup.system())
         .add_startup_system(world::setup.system())
@@ -57,6 +62,8 @@ fn main() {
         .add_system(player::character_movement.system())
         .add_system(ui::ui_windows.system())
         .add_system(player_input::my_cursor_system.system())
+        .add_system(sprite_tools::sprite_change_event.system())
+        .add_system(ui::inventory_button_event.system())
         // .add_plugin(PrintDiagnosticsPlugin::default())
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         // .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
@@ -129,8 +136,8 @@ fn load(
             .spawn(Camera2dBundle {
                 transform: Transform {
                     translation: Vec3::new(
-                        500 as f32 * worldprops.tile_size as f32,
-                        500 as f32 * worldprops.tile_size as f32,
+                        0.0, //500 as f32 * worldprops.tile_size as f32,
+                        0.0, //500 as f32 * worldprops.tile_size as f32,
                         1.0,
                     ),
                     rotation: Quat::identity(),
@@ -201,16 +208,19 @@ fn build_world(
                     if tile_index > 3 && tile_index < 7 {
                         let h = Harvestable {
                             pos: Position { x: x, y: y },
-                            items: vec![common_components::Item {
-                                name: String::from("Wood"),
+                            items: vec![common_components::ItemType::Wood {
+                                name: String::from("Wood")                                
                             }],
                         };
                         game_state.harvestable_tiles.push(h);
                     } else if tile_index == 11 {
                         let h = Harvestable {
                             pos: Position { x: x, y: y },
-                            items: vec![common_components::Item {
+                            items: vec![common_components::ItemType::Water {
                                 name: String::from("Water"),
+                                consume: Consumable {
+                                    attribute_effect: vec![(Attribute::Thirst, 20)]
+                                }
                             }],
                         };
                         game_state.harvestable_tiles.push(h)
@@ -247,7 +257,7 @@ fn build_world(
         player_tile.z_order = 1;
         tiles.push(player_tile);
 
-        let player_start = (worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
+        let player_start = (0,0);//(worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
 
         commands.spawn(PlayerBundle {
             player: Player {

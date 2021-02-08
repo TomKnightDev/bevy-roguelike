@@ -13,7 +13,7 @@ pub struct Player {
     pub health: f32,
     pub thirst: f32,
     pub hunger: f32,
-    pub temperature: f32    
+    pub temperature: f32,
 }
 
 #[derive(Bundle)]
@@ -29,9 +29,48 @@ impl Player {
         if self.thirst >= 100.0 || self.hunger >= 100.0 {
             self.health -= 0.1;
         } else {
-            self.thirst += 0.01;
-            self.hunger += 0.002;
+            self.thirst += 0.05;
+            self.hunger += 0.01;
         }
+    }
+
+    pub fn consume_item(&mut self, item_type: &ItemType) -> bool {
+        match item_type {
+            ItemType::Water {name: _, consume } => {
+                for e in consume.attribute_effect.iter() {
+                    match e.0 {
+                        Attribute::Health => {
+                            if self.health >= 100.0 {
+                                return false;
+                            }
+                            self.health += f32::min(self.health, e.1 as f32);
+                            return true;
+                        }
+                        Attribute::Thirst => {
+                            if self.thirst <= 0.0 {
+                                return false;
+                            }
+                            self.thirst -= f32::min(self.thirst, e.1 as f32);
+                            return true;
+                        }
+                        Attribute::Hunger => {
+                            if self.hunger <= 0.0 {
+                                return false;
+                            }
+                            self.hunger -= f32::min(self.hunger,e.1 as f32);
+                            return true;
+                        }
+                        Attribute::Temperature => {                            
+                            self.temperature += e.1 as f32;
+                            return true;
+                        }
+                    }
+                }
+            }
+            _ => return false,
+        }
+
+        return false;
     }
 }
 
@@ -197,6 +236,6 @@ pub fn try_move_player(
         position.x = position.x + delta_xy.0;
         position.y = position.y + delta_xy.1;
         camera_translation.x = camera_translation.x + (delta_xy.0 as f32 * tile_size as f32);
-        camera_translation.y = camera_translation.y + (delta_xy.1 as f32 * tile_size as f32);    
+        camera_translation.y = camera_translation.y + (delta_xy.1 as f32 * tile_size as f32);
     }
 }

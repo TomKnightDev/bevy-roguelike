@@ -1,11 +1,10 @@
-use bevy::{input, prelude::*, utils::tracing::Instrument};
-use std::collections::HashMap;
-
-use crate::player;
+use bevy::prelude::*; //, utils::tracing::Instrument};
+                      // use std::collections::HashMap;
 
 use super::common_components::*;
 use super::game::*;
 use super::player::*;
+use super::sprite_tools::*;
 use super::world::*;
 
 pub struct MainCamera;
@@ -28,6 +27,7 @@ pub fn my_cursor_system(
     mut mouse_state: ResMut<MouseState>,
     mut game_state: ResMut<GameState>,
     mut q_player: Query<(&Player, &mut Inventory)>,
+    mut ev_sprite_changed: ResMut<Events<SpriteChangeEvent>>,
 ) {
     // assuming there is exactly one main camera entity, so this is OK
     //let camera_transform = q_camera.iter().next().unwrap();
@@ -53,7 +53,7 @@ pub fn my_cursor_system(
     }
 
     if btn.just_pressed(MouseButton::Left) {
-        eprintln!("World coords: {}/{}", mouse_state.pos.x, mouse_state.pos.y);
+        println!("World coords: {}/{}", mouse_state.pos.x, mouse_state.pos.y);
 
         //Harvestable
         let hv = game_state
@@ -63,18 +63,24 @@ pub fn my_cursor_system(
             .next();
 
         if !hv.is_none() {
-            let i = hv.unwrap().items.iter_mut().next().unwrap().clone();
-            if !q_player.iter_mut().next().is_none() {
-                println!("Got {}", i.name);
-                let mut p = q_player.iter_mut().next().unwrap().1;
+            let i = hv.unwrap().items.iter_mut().next().unwrap();
 
-                //if p.items.contains_key(&i) {
-                   let item_inv = p.items.entry(i).or_insert(0);
-                   *item_inv += 1;
-                //} else {
-                //    p.items.insert(i, 1);
-                //}
+            for (_, mut inventory) in q_player.iter_mut() {
+                // if !q_player.iter_mut().next().is_none() {
+                // eprintln!("Got {}", i);
+                // let mut p = q_player.iter_mut().next().unwrap().1;
+                    eprintln!("BEFORE");
+                if inventory.items.get(&i).is_none() {
+                    eprintln!("NONE");
+                    inventory.items.insert(i.clone(), 1);
+                } else {
+                    *inventory.items.get_mut(i).unwrap() += 1;
+                }
+                // *item_inv += 1;
             }
+            //Change tile
+            ev_sprite_changed.send(SpriteChangeEvent(mouse_state.pos));
+            // }
         }
     }
 }
