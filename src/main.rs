@@ -1,15 +1,25 @@
-use bevy::{
-    asset::LoadState, prelude::*, render::camera::Camera, sprite::TextureAtlasBuilder,
-    utils::HashSet, window::WindowMode,
-};
-use bevy_tilemap::prelude::*;
-use serde::Deserialize;
-use serde_json;
+use bevy::{asset::LoadState, prelude::*, sprite::TextureAtlasBuilder, window::WindowMode};
+use std::collections::HashMap;
 
-use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+// use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
+
+use bevy_egui::EguiPlugin;
+use bevy_tilemap::prelude::*;
+
+mod ui;
+
+mod world;
+use world::*;
+pub mod common_components;
+use common_components::{Harvestable, Inventory, Position, Render};
+mod player;
+use player::*;
+pub mod game;
+use game::*;
+pub mod sprite_tools;
+
+mod player_input;
+use player_input::*;
 
 #[derive(Default, Clone)]
 struct SpriteHandles {
@@ -17,63 +27,10 @@ struct SpriteHandles {
     atlas_loaded: bool,
 }
 
-#[derive(Default, Clone)]
-struct GameState {
-    map_loaded: bool,
-    spawned: bool,
-    collisions: HashSet<(i32, i32)>,
-}
-
-impl GameState {
-    fn try_move_player(
-        &mut self,
-        position: &mut Position,
-        camera_translation: &mut Vec3,
-        delta_xy: (i32, i32),
-    ) {
-        let new_pos = (position.x + delta_xy.0, position.y + delta_xy.1);
-        if !self.collisions.contains(&new_pos) {
-            position.x = position.x + delta_xy.0;
-            position.y = position.y + delta_xy.1;
-            camera_translation.x = camera_translation.x + (delta_xy.0 as f32 * 32.);
-            camera_translation.y = camera_translation.y + (delta_xy.1 as f32 * 32.);
-        }
-    }
-}
-
-#[derive(Default, Clone)]
-struct WorldMap {
-    height: i64,
-    width: i64,
-    tiles: Vec<Vec<i64>>,
-}
-
-#[derive(Default)]
-struct Player {}
-
-#[derive(Default, Copy, Clone, PartialEq)]
-struct Position {
-    x: i32,
-    y: i32,
-}
-
-#[derive(Default)]
-struct Render {
-    sprite_index: usize,
-    z_order: usize,
-}
-
-#[derive(Bundle)]
-struct PlayerBundle {
-    player: Player,
-    position: Position,
-    render: Render,
-}
-
 fn main() {
     App::build()
         .add_resource(WindowDescriptor {
-            title: "Square Tiles".to_string(),
+            title: "Roguelike".to_string(),
             width: 1920.,
             height: 1080.,
             vsync: false,
@@ -81,54 +38,33 @@ fn main() {
             mode: WindowMode::Windowed,
             ..Default::default()
         })
+        .add_resource(ClearColor(Color::BLACK))
         .init_resource::<SpriteHandles>()
         .init_resource::<GameState>()
         .init_resource::<WorldMap>()
+        .init_resource::<WorldProps>()
+        .init_resource::<Player>()
+        .init_resource::<MouseState>()
+        // .init_resource::<player_input::InputState>()
         .add_plugins(DefaultPlugins)
         .add_plugins(TilemapDefaultPlugins)
+        // .add_plugin(MegaUiPlugin)
+        .add_plugin(EguiPlugin)
         .add_startup_system(setup.system())
+        .add_startup_system(world::setup.system())
         .add_system(load.system())
         .add_system(build_world.system())
-        .add_system(character_movement.system())
+        .add_system(player::character_movement.system())
+        .add_system(ui::ui_windows.system())
+        .add_system(player_input::my_cursor_system.system())
+        // .add_plugin(PrintDiagnosticsPlugin::default())
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        // .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
         .run()
 }
 
-fn setup(
-    commands: &mut Commands,
-    mut tile_sprite_handles: ResMut<SpriteHandles>,
-    mut world_map: ResMut<WorldMap>,
-    asset_server: Res<AssetServer>,
-) {
+fn setup(mut tile_sprite_handles: ResMut<SpriteHandles>, asset_server: Res<AssetServer>) {
     tile_sprite_handles.handles = asset_server.load_folder("textures").unwrap();
-    //Get world map
-    let file = File::open("assets/Tilemap/test_world.json").expect("File not found");
-    let reader = BufReader::new(file);
-
-    let json_map: serde_json::Value =
-        serde_json::from_reader(reader).expect("Read of json file failed");
-    let layer_0_data = json_map["layers"][0]
-        .get("data")
-        .expect("Failed")
-        .as_array()
-        .expect("");
-
-    world_map.height = json_map["height"].as_i64().unwrap();
-    world_map.width = json_map["width"].as_i64().unwrap();
-
-    let width = world_map.width;
-
-    for x in 0..world_map.width {
-        world_map.tiles.push(Vec::new());
-
-        for y in 0..world_map.height {
-            world_map.tiles[x as usize]
-                .push(layer_0_data[((width * x) + y) as usize].as_i64().unwrap());
-        }
-    }
-
-    // for i in world_map.tiles.iter() {
-    //     println!("{:?}", i);
-    // }
 }
 
 fn load(
@@ -137,6 +73,7 @@ fn load(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut textures: ResMut<Assets<Texture>>,
     asset_server: Res<AssetServer>,
+    worldprops: Res<WorldProps>,
 ) {
     if sprite_handles.atlas_loaded {
         return;
@@ -150,6 +87,15 @@ fn load(
         for handle in sprite_handles.handles.iter() {
             let texture = textures.get(handle).unwrap();
             texture_atlas_builder.add_texture(handle.clone_weak().typed::<Texture>(), &texture);
+
+            // let ta = TextureAtlas::from_grid(
+            //     sprite_handles.handles[0].clone_weak().typed::<Texture>(),
+            //     Vec2::new(10.0, 10.0),
+            //     30 as usize,
+            //     30 as usize,
+            // );
+
+            // let atlas_handle = texture_atlases.add(ta);
         }
 
         let texture_atlas = texture_atlas_builder.finish(&mut textures).unwrap();
@@ -157,11 +103,17 @@ fn load(
 
         let tilemap = Tilemap::builder()
             .topology(GridTopology::Square)
-            .dimensions(4, 4)
-            .chunk_dimensions(10, 10)
-            .tile_dimensions(32, 32)
+            .dimensions(
+                worldprops.tilemap_width as u32,
+                worldprops.tilemap_height as u32,
+            )
+            .chunk_dimensions(
+                worldprops.chunk_width as u32,
+                worldprops.chunk_height as u32,
+            )
+            .tile_dimensions(worldprops.tile_size as u32, worldprops.tile_size as u32)
             .auto_chunk()
-            .auto_configure()
+            // .auto_configure()
             .z_layers(3)
             .texture_atlas(atlas_handle)
             .finish()
@@ -173,7 +125,21 @@ fn load(
             global_transform: Default::default(),
         };
 
-        commands.spawn(Camera2dBundle::default());
+        commands
+            .spawn(Camera2dBundle {
+                transform: Transform {
+                    translation: Vec3::new(
+                        500 as f32 * worldprops.tile_size as f32,
+                        500 as f32 * worldprops.tile_size as f32,
+                        1.0,
+                    ),
+                    rotation: Quat::identity(),
+                    scale: Vec3::new(0.3, 0.3, 1.0),
+                },
+                ..Default::default()
+            })
+            .with(player_input::MainCamera);
+
         commands
             .spawn(tilemap_components)
             .with(Timer::from_seconds(0.075, true));
@@ -189,77 +155,128 @@ fn build_world(
     asset_server: Res<AssetServer>,
     mut query: Query<&mut Tilemap>,
     world_map: ResMut<WorldMap>,
+    worldprops: Res<WorldProps>,
+    player: Res<Player>,
 ) {
     if game_state.map_loaded {
         return;
     }
 
     for mut map in query.iter_mut() {
-        let chunk_width = (map.width().unwrap() * map.chunk_width()) as i32;
-        let chunk_height = (map.height().unwrap() * map.chunk_height()) as i32;
+        // let chunk_width = (map.width().unwrap() * map.chunk_width()) as i32;
+        // let chunk_height = (map.height().unwrap() * map.chunk_height()) as i32;
         let texture_atlas = texture_atlases.get(map.texture_atlas()).unwrap();
 
-        let floor: Handle<Texture> = asset_server.get_handle("textures/terrain/square-floor.png");
-        let wall: Handle<Texture> = asset_server.get_handle("textures/terrain/square-wall.png");
-        let floor_index = texture_atlas.get_texture_index(&floor).unwrap();
-        let wall_index = texture_atlas.get_texture_index(&wall).unwrap();
+        let grass_0: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_0.png");
+        let grass_1: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_1.png");
+        let grass_2: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_2.png");
+        let grass_0_index = texture_atlas.get_texture_index(&grass_0).unwrap();
+        let grass_1_index = texture_atlas.get_texture_index(&grass_1).unwrap();
+        let grass_2_index = texture_atlas.get_texture_index(&grass_2).unwrap();
+
+        let tree_0: Handle<Texture> = asset_server.get_handle("textures/terrain/tree_0.png");
+        let tree_1: Handle<Texture> = asset_server.get_handle("textures/terrain/tree_1.png");
+        let tree_2: Handle<Texture> = asset_server.get_handle("textures/terrain/tree_2.png");
+        let tree_0_index = texture_atlas.get_texture_index(&tree_0).unwrap();
+        let tree_1_index = texture_atlas.get_texture_index(&tree_1).unwrap();
+        let tree_2_index = texture_atlas.get_texture_index(&tree_2).unwrap();
+
+        let water_4: Handle<Texture> = asset_server.get_handle("textures/terrain/water_4.png");
+        let water_4_index = texture_atlas.get_texture_index(&water_4).unwrap();
+
+        // let wall: Handle<Texture> = asset_server.get_handle("textures/terrain/square-wall.png");
+        // let wall_index = texture_atlas.get_texture_index(&wall).unwrap();
 
         let mut tiles = Vec::new();
-        let mut world_x = 0;
-        let mut world_y = 0;
+        for x in 0..worldprops.tilemap_width {
+            for y in 0..worldprops.tilemap_height {
+                let mut tile = Tile::new((x, y), grass_0_index);
 
-        for x in 0..chunk_width {
-            for y in 0..chunk_height {
-                let y = y - chunk_height / 2;
-                let x = x - chunk_width / 2;
+                let tile_index = world_map.tiles[x as usize][y as usize] as usize;
 
-                let mut tile = Tile::new((x, y), floor_index);
+                //Collidables and Harvestables
+                if (tile_index > 3 && tile_index < 7) || tile_index == 11 {
+                    game_state.collisions.insert((x, y));
 
-                if world_x < 100 && world_y < 100 {
-                    let tile_index = world_map.tiles[world_x as usize][world_y as usize] as usize;
-                    match tile_index {
-                        1 => tile.sprite_index = floor_index,
-                        _ => {
-                            tile.sprite_index = wall_index;
-                            game_state.collisions.insert((x, y));
-                        }
+                    if tile_index > 3 && tile_index < 7 {
+                        let h = Harvestable {
+                            pos: Position { x: x, y: y },
+                            items: vec![common_components::Item {
+                                name: String::from("Wood"),
+                            }],
+                        };
+                        game_state.harvestable_tiles.push(h);
+                    } else if tile_index == 11 {
+                        let h = Harvestable {
+                            pos: Position { x: x, y: y },
+                            items: vec![common_components::Item {
+                                name: String::from("Water"),
+                            }],
+                        };
+                        game_state.harvestable_tiles.push(h)
+                    }
+                }
+
+                match tile_index {
+                    1 => tile.sprite_index = grass_0_index,
+                    2 => tile.sprite_index = grass_1_index,
+                    3 => tile.sprite_index = grass_2_index,
+                    4 => tile.sprite_index = tree_0_index,
+                    5 => tile.sprite_index = tree_1_index,
+                    6 => tile.sprite_index = tree_2_index,
+                    11 => tile.sprite_index = water_4_index,
+                    _ => {
+                        tile.sprite_index = grass_0_index;
+                        // game_state.collisions.insert((x, y));
                     }
                 }
 
                 tiles.push(tile);
-
-                world_y += 1;
             }
-
-            world_y = 0;
-            world_x += 1;
         }
 
         map.add_layer_with_kind(LayerKind::Sparse, 1).unwrap();
 
         // Now lets add in a dwarf friend!
-        let dwarf_sprite: Handle<Texture> =
-            asset_server.get_handle("textures/creatures/square-dwarf.png");
-        let dwarf_sprite_index = texture_atlas.get_texture_index(&dwarf_sprite).unwrap();
+        let player_sprite: Handle<Texture> =
+            asset_server.get_handle("textures/creatures/player.png");
+        let player_sprite_index = texture_atlas.get_texture_index(&player_sprite).unwrap();
         // We add in a Z order of 1 to place the tile above the background on Z
         // order 0.
-        let mut dwarf_tile = Tile::new((0, 0), dwarf_sprite_index);
-        dwarf_tile.z_order = 1;
-        tiles.push(dwarf_tile);
+        let mut player_tile = Tile::new(player.start_pos, player_sprite_index);
+        player_tile.z_order = 1;
+        tiles.push(player_tile);
+
+        let player_start = (worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
 
         commands.spawn(PlayerBundle {
-            player: Player {},
-            position: Position { x: 0, y: 0 },
+            player: Player {
+                start_pos: player_start,
+                name: String::from("Player1"),
+                health: 100.0,
+                thirst: 0.0,
+                hunger: 0.0,
+                temperature: 50.0,
+            },
+            position: Position {
+                x: player_start.0,
+                y: player_start.1,
+            },
             render: Render {
-                sprite_index: dwarf_sprite_index,
+                sprite_index: player_sprite_index,
                 z_order: 1,
+            },
+            inventory: Inventory {
+                items: HashMap::new(),
             },
         });
 
         map.insert_tiles(tiles).unwrap();
 
+        map.spawn_chunk_containing_point(player_start).unwrap();
+
         // map.spawn_chunk((-1, 0)).unwrap();
-        map.spawn_chunk((0, 0)).unwrap();
+        // map.spawn_chunk((0, 0)).unwrap();
         // map.spawn_chunk((1, 0)).unwrap();
         // map.spawn_chunk((-1, 1)).unwrap();
         // map.spawn_chunk((0, 1)).unwrap();
@@ -269,120 +286,5 @@ fn build_world(
         // map.spawn_chunk((1, -1)).unwrap();
 
         game_state.map_loaded = true;
-    }
-}
-
-fn move_sprite(
-    map: &mut Tilemap,
-    previous_position: Position,
-    position: Position,
-    render: &Render,
-    // camera_translation: &mut Transform,
-) {
-    // println!(
-    //     "Previous pos - {}/{}, New pos - {}/{}",
-    //     previous_position.x, previous_position.y, position.x, position.y
-    // );
-
-    // We need to first remove where we were prior.
-    map.clear_tile((previous_position.x, previous_position.y), 1)
-        .unwrap();
-    // We then need to update where we are going!
-    let mut tile = Tile::new((position.x, position.y), render.sprite_index);
-    tile.z_order = render.z_order;
-
-    map.insert_tile(tile).unwrap();
-
-    map.spawn_chunk_containing_point((position.x, position.y)).unwrap();
-    // map.despawn_chunk((previous_position.x, previous_position.y)).unwrap();
-}
-
-fn character_movement(
-    mut game_state: ResMut<GameState>,
-    keyboard_input: Res<Input<KeyCode>>,
-    time: Res<Time>,
-    mut map_query: Query<(&mut Tilemap, &mut Timer)>,
-    mut player_query: Query<(&mut Position, &Render, &Player)>,
-    mut camera_query: Query<(&Camera, &mut Transform)>,
-) {
-    if !game_state.map_loaded {
-        return;
-    }
-
-    for (mut map, mut timer) in map_query.iter_mut() {
-        timer.tick(time.delta_seconds());
-        if !timer.finished() {
-            continue;
-        }
-
-        for (mut position, render, _player) in player_query.iter_mut() {
-            for key in keyboard_input.get_pressed() {
-                for (_camera, mut camera_transform) in camera_query.iter_mut() {
-                    // First we need to store our very current position.
-                    let previous_position = *position;
-
-                    // Of course we need to control where we are going to move our
-                    // dwarf friend.
-                    use KeyCode::*;
-                    match key {
-                        W | Numpad8 | Up | K => {
-                            game_state.try_move_player(
-                                &mut position,
-                                &mut camera_transform.translation,
-                                (0, 1),
-                            );
-                        }
-                        A | Numpad4 | Left | H => {
-                            game_state.try_move_player(
-                                &mut position,
-                                &mut camera_transform.translation,
-                                (-1, 0),
-                            );
-                        }
-                        S | Numpad2 | Down | J => {
-                            game_state.try_move_player(
-                                &mut position,
-                                &mut camera_transform.translation,
-                                (0, -1),
-                            );
-                        }
-                        D | Numpad6 | Right | L => {
-                            game_state.try_move_player(
-                                &mut position,
-                                &mut camera_transform.translation,
-                                (1, 0),
-                            );
-                        }
-
-                        Numpad9 | U => game_state.try_move_player(
-                            &mut position,
-                            &mut camera_transform.translation,
-                            (1, 1),
-                        ),
-                        Numpad3 | M => game_state.try_move_player(
-                            &mut position,
-                            &mut camera_transform.translation,
-                            (1, -1),
-                        ),
-                        Numpad1 | N => game_state.try_move_player(
-                            &mut position,
-                            &mut camera_transform.translation,
-                            (-1, -1),
-                        ),
-                        Numpad7 | Y => game_state.try_move_player(
-                            &mut position,
-                            &mut camera_transform.translation,
-                            (-1, 1),
-                        ),
-
-                        _ => {}
-                    }
-
-                    // Finally now we will move the sprite! ... Provided he had
-                    // moved!
-                    move_sprite(&mut map, previous_position, *position, render);
-                }
-            }
-        }
     }
 }
