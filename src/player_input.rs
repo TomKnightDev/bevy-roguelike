@@ -19,7 +19,7 @@ pub fn my_cursor_system(
     ev_cursor: Res<Events<CursorMoved>>,
     mut evr_cursor: Local<EventReader<CursorMoved>>,
     wnds: Res<Windows>,
-    q_camera: Query<&Transform, With<MainCamera>>,
+    mut q_camera: Query<&mut Transform, With<MainCamera>>,
     world_props: Res<WorldProps>,
     btn: Res<Input<MouseButton>>,
     mut mouse_state: ResMut<MouseState>,
@@ -58,7 +58,21 @@ pub fn my_cursor_system(
         }
     }
 
-    for camera_transform in q_camera.iter() {
+    for mut camera_transform in q_camera.iter_mut() {
+        if key.just_pressed(KeyCode::E) {
+            camera_transform.scale = Vec3::new(
+                f32::max(0.1, camera_transform.scale.x - 0.1),
+                f32::max(0.1, camera_transform.scale.y - 0.1),
+                camera_transform.scale.z,
+            );
+        } else if key.just_pressed(KeyCode::Q) && camera_transform.scale.x < 1.0 {
+            camera_transform.scale = Vec3::new(
+                f32::min(1.0, camera_transform.scale.x + 0.1),
+                f32::min(1.0, camera_transform.scale.y + 0.1),
+                camera_transform.scale.z,
+            );
+        }
+
         for ev in evr_cursor.iter(&ev_cursor) {
             // get the size of the window that the event is for
             let wnd = wnds.get(ev.id).unwrap();

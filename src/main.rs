@@ -154,7 +154,7 @@ fn load(
                         1.0,
                     ),
                     rotation: Quat::identity(),
-                    scale: Vec3::new(0.3, 0.3, 1.0),
+                    scale: Vec3::new(0.2, 0.2, 1.0),
                 },
                 ..Default::default()
             })
