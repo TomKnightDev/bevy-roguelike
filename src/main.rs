@@ -1,8 +1,8 @@
 use bevy::{asset::LoadState, prelude::*, sprite::TextureAtlasBuilder, window::WindowMode};
 use bevy_tilemap::prelude::*;
 use sprite_tools::SpriteChangeEvent;
-use ui::{InventoryButtonEvent, InventoryButtonEventListenerState};
 use std::collections::HashMap;
+use ui::{InventoryButtonEvent, InventoryButtonEventListenerState};
 
 // use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
 
@@ -22,6 +22,10 @@ pub mod sprite_tools;
 use sprite_tools::*;
 mod player_input;
 use player_input::*;
+
+pub struct Materials {
+    pub wall_horizontal_material: Handle<ColorMaterial>,
+}
 
 #[derive(Default, Clone)]
 struct SpriteHandles {
@@ -57,6 +61,7 @@ fn main() {
         .add_plugin(EguiPlugin)
         .add_startup_system(setup.system())
         .add_startup_system(world::setup.system())
+        .add_startup_system(player_input::input_setup.system())
         .add_system(load.system())
         .add_system(build_world.system())
         .add_system(player::character_movement.system())
@@ -70,8 +75,16 @@ fn main() {
         .run()
 }
 
-fn setup(mut tile_sprite_handles: ResMut<SpriteHandles>, asset_server: Res<AssetServer>) {
+fn setup(
+    commands: &mut Commands,
+    mut tile_sprite_handles: ResMut<SpriteHandles>,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
     tile_sprite_handles.handles = asset_server.load_folder("textures").unwrap();
+    commands.insert_resource(Materials {
+        wall_horizontal_material: asset_server.load("textures/buildings/wall_horizontal.png"),
+    });
 }
 
 fn load(
@@ -177,9 +190,11 @@ fn build_world(
         let grass_0: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_0.png");
         let grass_1: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_1.png");
         let grass_2: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_2.png");
+        let grass_3: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_3.png");
         let grass_0_index = texture_atlas.get_texture_index(&grass_0).unwrap();
         let grass_1_index = texture_atlas.get_texture_index(&grass_1).unwrap();
         let grass_2_index = texture_atlas.get_texture_index(&grass_2).unwrap();
+        let grass_3_index = texture_atlas.get_texture_index(&grass_3).unwrap();
 
         let tree_0: Handle<Texture> = asset_server.get_handle("textures/terrain/tree_0.png");
         let tree_1: Handle<Texture> = asset_server.get_handle("textures/terrain/tree_1.png");
@@ -209,7 +224,7 @@ fn build_world(
                         let h = Harvestable {
                             pos: Position { x: x, y: y },
                             items: vec![common_components::ItemType::Wood {
-                                name: String::from("Wood")                                
+                                name: String::from("Wood"),
                             }],
                         };
                         game_state.harvestable_tiles.push(h);
@@ -219,8 +234,8 @@ fn build_world(
                             items: vec![common_components::ItemType::Water {
                                 name: String::from("Water"),
                                 consume: Consumable {
-                                    attribute_effect: vec![(Attribute::Thirst, 20)]
-                                }
+                                    attribute_effect: vec![(Attribute::Thirst, 20)],
+                                },
                             }],
                         };
                         game_state.harvestable_tiles.push(h)
@@ -235,6 +250,7 @@ fn build_world(
                     5 => tile.sprite_index = tree_1_index,
                     6 => tile.sprite_index = tree_2_index,
                     11 => tile.sprite_index = water_4_index,
+                    22 => tile.sprite_index = grass_3_index,
                     _ => {
                         tile.sprite_index = grass_0_index;
                         // game_state.collisions.insert((x, y));
@@ -257,7 +273,7 @@ fn build_world(
         player_tile.z_order = 1;
         tiles.push(player_tile);
 
-        let player_start = (0,0);//(worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
+        let player_start = (0, 0); //(worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
 
         commands.spawn(PlayerBundle {
             player: Player {

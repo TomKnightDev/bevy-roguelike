@@ -15,12 +15,10 @@ pub struct MouseState {
 }
 
 pub fn my_cursor_system(
-    // events to get cursor position
+    commands: &mut Commands,
     ev_cursor: Res<Events<CursorMoved>>,
     mut evr_cursor: Local<EventReader<CursorMoved>>,
-    // need to get window dimensions
     wnds: Res<Windows>,
-    // query to get camera transform
     q_camera: Query<&Transform, With<MainCamera>>,
     world_props: Res<WorldProps>,
     btn: Res<Input<MouseButton>>,
@@ -28,9 +26,37 @@ pub fn my_cursor_system(
     mut game_state: ResMut<GameState>,
     mut q_player: Query<(&Player, &mut Inventory)>,
     mut ev_sprite_changed: ResMut<Events<SpriteChangeEvent>>,
+    mut q_cursor: Query<(&MouseState, &mut Transform, Entity)>,
+    key: Res<Input<KeyCode>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     // assuming there is exactly one main camera entity, so this is OK
     //let camera_transform = q_camera.iter().next().unwrap();
+
+    if key.just_pressed(KeyCode::Escape) {
+        for (_, t, e) in &mut q_cursor.iter_mut() {
+            commands.despawn(e);
+
+            commands
+                .spawn(SpriteBundle {
+                    material: materials.add(asset_server.load("textures/cursor.png").into()), //materials.wall_horizontal_material.clone(),
+                    transform: Transform {
+                        translation: Vec3::new(
+                            mouse_state.pos.x as f32,
+                            mouse_state.pos.y as f32,
+                            2.0,
+                        ),
+                        scale: Vec3::new(0.5, 0.5, 1.0),
+                        rotation: Quat::identity(),
+                    },
+                    ..Default::default()
+                })
+                .with(MouseState {
+                    pos: mouse_state.pos,
+                });
+        }
+    }
 
     for camera_transform in q_camera.iter() {
         for ev in evr_cursor.iter(&ev_cursor) {
@@ -44,11 +70,19 @@ pub fn my_cursor_system(
 
             // apply the camera transform
             let pos_wld = camera_transform.compute_matrix() * p.extend(0.0).extend(1.0);
+
             mouse_state.pos = Position {
                 x: (pos_wld.x / world_props.tile_size as f32) as i32,
                 y: (pos_wld.y / world_props.tile_size as f32) as i32,
             };
-            // mouse_state.pos_y = as i32;
+
+            for (_, mut trans, _) in &mut q_cursor.iter_mut() {
+                trans.translation = Vec3::new(
+                    (mouse_state.pos.x * world_props.tile_size) as f32 + 4.0,
+                    (mouse_state.pos.y * world_props.tile_size) as f32 + 4.0,
+                    1.00,
+                );
+            }
         }
     }
 
@@ -58,29 +92,60 @@ pub fn my_cursor_system(
         //Harvestable
         let hv = game_state
             .harvestable_tiles
-            .iter_mut()
+            .iter()
             .filter(|h| h.pos == mouse_state.pos)
             .next();
 
         if !hv.is_none() {
-            let i = hv.unwrap().items.iter_mut().next().unwrap();
+            let hi = hv.unwrap();
+            let i = hi.items.iter().next().unwrap();
+            let pos = hi.pos;
 
             for (_, mut inventory) in q_player.iter_mut() {
-                // if !q_player.iter_mut().next().is_none() {
-                // eprintln!("Got {}", i);
-                // let mut p = q_player.iter_mut().next().unwrap().1;
-                    eprintln!("BEFORE");
-                if inventory.items.get(&i).is_none() {
-                    eprintln!("NONE");
-                    inventory.items.insert(i.clone(), 1);
-                } else {
+                // inventory.items.keys().filter(|item| item == i);
+
+                if inventory.items.contains_key(i) {
                     *inventory.items.get_mut(i).unwrap() += 1;
+                } else {
+                    inventory.items.insert(i.clone(), 1);
                 }
-                // *item_inv += 1;
             }
+
+            let index = game_state
+                .harvestable_tiles
+                .iter()
+                .position(|p| p.pos == pos)
+                .unwrap();
+
+            eprintln!("{},{:?}", index, pos);
+
+            game_state.harvestable_tiles.remove(index);
+
             //Change tile
             ev_sprite_changed.send(SpriteChangeEvent(mouse_state.pos));
             // }
         }
     }
+}
+
+pub fn input_setup(
+    commands: &mut Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    let texture_handle = asset_server.load("textures/cursor.png");
+
+    commands
+        .spawn(SpriteBundle {
+            material: materials.add(texture_handle.into()),
+            transform: Transform {
+                translation: Vec3::new(0.0, 0.0, 1.0),
+                scale: Vec3::new(0.5, 0.5, 1.0),
+                rotation: Quat::identity(),
+            },
+            ..Default::default()
+        })
+        .with(MouseState {
+            pos: Position { x: 0, y: 0 },
+        });
 }

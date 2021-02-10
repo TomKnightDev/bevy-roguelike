@@ -1,10 +1,17 @@
 use std::collections::HashMap;
 
-#[derive(Default, Copy, Clone, PartialEq, Debug)]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
 }
+
+
+// impl PartialEq for Position {
+//     fn eq(&self, other: &Self) -> bool {
+//         self == other
+//     }
+// }
 
 #[derive(Default)]
 pub struct Render {
@@ -28,34 +35,42 @@ pub struct Inventory {
 //     }
 // }
 
-#[derive(Clone, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Hash, Debug, Eq)]
 pub enum ItemType {
     Wood { name: String },
     Water { name: String, consume: Consumable },
 }
 
-impl PartialEq for ItemType {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
 
-#[derive(Default, Clone)]
+// impl PartialEq for ItemType {
+//     fn eq(&self, other: &Self) -> bool {
+//         self == other
+//     }
+// }
+
+#[derive(Default, Clone, PartialEq)]
 pub struct Harvestable {
     pub pos: Position,
     pub items: Vec<ItemType>,
 }
 
-#[derive(Default, Clone, Eq, Hash, Debug)]
+
+// impl PartialEq for Harvestable {
+//     fn eq(&self, other: &Self) -> bool {
+//         self == other
+//     }
+// }
+
+#[derive(Default, Clone, PartialEq, Hash, Debug, Eq)]
 pub struct Consumable {
     pub attribute_effect: Vec<(Attribute, i32)>,
 }
 
-impl PartialEq for Consumable {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
+// impl PartialEq for Consumable {
+//     fn eq(&self, other: &Self) -> bool {
+//         self == other
+//     }
+// }
 
 // impl Consumable {
 //     fn Consume(&self) {
@@ -63,7 +78,7 @@ impl PartialEq for Consumable {
 //     }
 // }
 
-#[derive(Clone, Hash, Eq, Debug)]
+#[derive(Clone, Hash, PartialEq, Debug, Eq)]
 pub enum Attribute {
     Thirst,
     Hunger,
@@ -71,8 +86,8 @@ pub enum Attribute {
     Temperature,
 }
 
-impl PartialEq for Attribute {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
+// impl PartialEq for Attribute {
+//     fn eq(&self, other: &Self) -> bool {
+//         self == other
+//     }
+// }

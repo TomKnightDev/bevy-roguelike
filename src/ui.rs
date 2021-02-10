@@ -2,16 +2,26 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use egui::Pos2;
 
+use crate::Materials;
+
 use super::common_components::*;
 use super::player::Player;
+use super::MouseState;
 
 pub fn ui_windows(
+    commands: &mut Commands,
     mut egui_context: ResMut<EguiContext>,
     mut egui_settings: ResMut<EguiSettings>,
     mut q_player: Query<(&mut Player, &Position, &mut Inventory)>,
     windows: Res<Windows>,
     mut ev_inventory_button: ResMut<Events<InventoryButtonEvent>>,
+    asset_server: Res<AssetServer>,
+    mut q_cursor: Query<(&MouseState, Entity)>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    let tid: u64 = 0;
+    let th = asset_server.load("textures/buildings/wall_horizontal.png");
+    egui_context.set_egui_texture(tid, th);
     let ctx = &mut egui_context.ctx;
 
     for (player, pos, inventory) in q_player.iter_mut() {
@@ -60,6 +70,40 @@ pub fn ui_windows(
                     egui_settings.scale_factor -= 0.5;
                 }
             });
+
+        egui::Window::new("Crafting").show(ctx, |ui| {
+            if ui
+                .add(egui::widgets::ImageButton::new(
+                    egui::TextureId::User(tid),
+                    [25.0, 25.0],
+                ))
+                .clicked
+            {
+                eprintln!("{:?}", q_cursor.iter_mut().count());
+
+                for (_, e) in q_cursor.iter_mut() {
+                    commands.despawn(e);
+
+                    commands
+                        .spawn(SpriteBundle {
+                            material: materials.add(
+                                asset_server
+                                    .load("textures/buildings/wall_horizontal.png")
+                                    .into(),
+                            ), //materials.wall_horizontal_material.clone(),
+                            transform: Transform {
+                                translation: Vec3::new(0.0, 0.0, 1.0),
+                                scale: Vec3::new(1.0, 1.0, 1.0),
+                                rotation: Quat::identity(),
+                            },
+                            ..Default::default()
+                        })
+                        .with(MouseState {
+                            pos: Position { x: 0, y: 0 },
+                        });
+                }
+            }
+        });
     }
 }
 
