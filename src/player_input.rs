@@ -45,9 +45,9 @@ pub fn my_cursor_system(
                         translation: Vec3::new(
                             mouse_state.pos.x as f32,
                             mouse_state.pos.y as f32,
-                            2.0,
+                            5.0,
                         ),
-                        scale: Vec3::new(0.5, 0.5, 1.0),
+                        scale: Vec3::new(1.0, 1.0, 1.0),
                         rotation: Quat::identity(),
                     },
                     ..Default::default()
@@ -153,8 +153,8 @@ pub fn input_setup(
         .spawn(SpriteBundle {
             material: materials.add(texture_handle.into()),
             transform: Transform {
-                translation: Vec3::new(0.0, 0.0, 1.0),
-                scale: Vec3::new(0.5, 0.5, 1.0),
+                translation: Vec3::new(0.0, 0.0, 5.0),
+                scale: Vec3::new(1.0, 1.0, 1.0),
                 rotation: Quat::identity(),
             },
             ..Default::default()
