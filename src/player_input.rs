@@ -35,7 +35,7 @@ pub fn my_cursor_system(
     //let camera_transform = q_camera.iter().next().unwrap();
 
     if key.just_pressed(KeyCode::Escape) {
-        for (_, t, e) in &mut q_cursor.iter_mut() {
+        for (_, _, e) in &mut q_cursor.iter_mut() {
             commands.despawn(e);
 
             commands
@@ -73,6 +73,12 @@ pub fn my_cursor_system(
             );
         }
 
+        if  key.just_pressed(KeyCode::PageDown) {
+            camera_transform.translation.z -= 1.0;
+        } else if key.just_pressed(KeyCode::PageUp) {
+            camera_transform.translation.z += 1.0;
+        }
+
         for ev in evr_cursor.iter(&ev_cursor) {
             // get the size of the window that the event is for
             let wnd = wnds.get(ev.id).unwrap();
@@ -94,7 +100,7 @@ pub fn my_cursor_system(
                 trans.translation = Vec3::new(
                     (mouse_state.pos.x * world_props.tile_size) as f32 + 4.0,
                     (mouse_state.pos.y * world_props.tile_size) as f32 + 4.0,
-                    1.00,
+                    camera_transform.translation.z - 0.5,
                 );
             }
         }

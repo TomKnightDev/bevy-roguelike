@@ -2,8 +2,6 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use egui::Pos2;
 
-use crate::Materials;
-
 use super::common_components::*;
 use super::player::Player;
 use super::MouseState;
@@ -26,7 +24,7 @@ pub fn ui_windows(
 
     for (player, pos, inventory) in q_player.iter_mut() {
         let player_name = format!("{}", player.name);
-        let pos = format!("x:{} - y:{}", pos.x, pos.y);
+        let pos = format!("x:{} - y:{}", pos.x, pos.y);        
         let health = format!("Health: {}", (player.health as i32).to_string());
         let thirst = format!("Thirst: {}", (player.thirst as i32).to_string());
         let hunger = format!("Hunger: {}", (player.hunger as i32).to_string());
@@ -44,12 +42,12 @@ pub fn ui_windows(
             for (item, qty) in inventory.items.iter() {
                 match item {
                     ItemType::Water { name, consume: _ } => {
-                        if ui.button(format!("{}: {}", name, qty)).clicked {
+                        if ui.button(format!("{}: {}", name, qty)).clicked() {
                             ev_inventory_button.send(InventoryButtonEvent(item.clone()));
                         };
                     }
                     ItemType::Wood { name } => {
-                        if ui.button(format!("{}: {}", name, qty)).clicked {};
+                        if ui.button(format!("{}: {}", name, qty)).clicked() {};
                     }
                 }
 
@@ -64,10 +62,20 @@ pub fn ui_windows(
             })
             .show(ctx, |ui| {
                 ui.heading("Scale");
-                if ui.button("Increase").clicked {
+                if ui.button("Increase").clicked() {
                     egui_settings.scale_factor += 0.5;
-                } else if ui.button("Decrease").clicked && egui_settings.scale_factor > 1.0 {
+                } else if ui.button("Decrease").clicked() && egui_settings.scale_factor > 1.0 {
                     egui_settings.scale_factor -= 0.5;
+                }
+
+                if ui.button("Quit").clicked() {
+                    std::process::exit(match super::main() {
+                        Ok(_) => 0,
+                        Err(err) => {
+                            eprintln!("error: {:?}", err);
+                            1
+                        }
+                    });
                 }
             });
 
@@ -77,7 +85,7 @@ pub fn ui_windows(
                     egui::TextureId::User(tid),
                     [25.0, 25.0],
                 ))
-                .clicked
+                .clicked()
             {
                 eprintln!("{:?}", q_cursor.iter_mut().count());
 
@@ -92,7 +100,7 @@ pub fn ui_windows(
                                     .into(),
                             ), //materials.wall_horizontal_material.clone(),
                             transform: Transform {
-                                translation: Vec3::new(0.0, 0.0, 1.0),
+                                translation: Vec3::new(0.0, 0.0, 2.0),
                                 scale: Vec3::new(1.0, 1.0, 1.0),
                                 rotation: Quat::identity(),
                             },

@@ -4,7 +4,7 @@ use sprite_tools::SpriteChangeEvent;
 use std::collections::HashMap;
 use ui::{InventoryButtonEvent, InventoryButtonEventListenerState};
 
-// use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
 
 use bevy_egui::EguiPlugin;
 
@@ -33,7 +33,7 @@ struct SpriteHandles {
     atlas_loaded: bool,
 }
 
-fn main() {
+fn main() -> Result<(), ()> {
     App::build()
         .add_resource(WindowDescriptor {
             title: "Roguelike".to_string(),
@@ -69,17 +69,18 @@ fn main() {
         .add_system(player_input::my_cursor_system.system())
         .add_system(sprite_tools::sprite_change_event.system())
         .add_system(ui::inventory_button_event.system())
-        // .add_plugin(PrintDiagnosticsPlugin::default())
-        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        // .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
-        .run()
+        .add_plugin(PrintDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
+        .run();
+
+    Ok(())
 }
 
 fn setup(
     commands: &mut Commands,
     mut tile_sprite_handles: ResMut<SpriteHandles>,
     asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     tile_sprite_handles.handles = asset_server.load_folder("textures").unwrap();
     commands.insert_resource(Materials {
@@ -134,7 +135,7 @@ fn load(
             .tile_dimensions(worldprops.tile_size as u32, worldprops.tile_size as u32)
             .auto_chunk()
             // .auto_configure()
-            .z_layers(3)
+            // .z_layers(3)
             .texture_atlas(atlas_handle)
             .finish()
             .unwrap();
@@ -151,7 +152,7 @@ fn load(
                     translation: Vec3::new(
                         0.0, //500 as f32 * worldprops.tile_size as f32,
                         0.0, //500 as f32 * worldprops.tile_size as f32,
-                        1.0,
+                        15.0,
                     ),
                     rotation: Quat::identity(),
                     scale: Vec3::new(0.2, 0.2, 1.0),
@@ -162,7 +163,7 @@ fn load(
 
         commands
             .spawn(tilemap_components)
-            .with(Timer::from_seconds(0.075, true));
+            .with(Timer::from_seconds(0.1, true));
 
         sprite_handles.atlas_loaded = true;
     }
@@ -210,10 +211,11 @@ fn build_world(
         // let wall_index = texture_atlas.get_texture_index(&wall).unwrap();
 
         let mut tiles = Vec::new();
+        let mut underground_tiles = Vec::new();
         for x in 0..worldprops.tilemap_width {
             for y in 0..worldprops.tilemap_height {
                 let mut tile = Tile::new((x, y), grass_0_index);
-
+                tile.z_order = 1;
                 let tile_index = world_map.tiles[x as usize][y as usize] as usize;
 
                 //Collidables and Harvestables
@@ -258,6 +260,11 @@ fn build_world(
                 }
 
                 tiles.push(tile);
+
+                //Underground tiles
+                let mut underground_tile = Tile::new((x, y), grass_0_index);
+                underground_tile.z_order = 0;
+                underground_tiles.push(underground_tile);
             }
         }
 
@@ -270,7 +277,7 @@ fn build_world(
         // We add in a Z order of 1 to place the tile above the background on Z
         // order 0.
         let mut player_tile = Tile::new(player.start_pos, player_sprite_index);
-        player_tile.z_order = 1;
+        player_tile.z_order = 2;
         tiles.push(player_tile);
 
         let player_start = (0, 0); //(worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
@@ -290,7 +297,7 @@ fn build_world(
             },
             render: Render {
                 sprite_index: player_sprite_index,
-                z_order: 1,
+                z_order: 2,
             },
             inventory: Inventory {
                 items: HashMap::new(),
@@ -298,8 +305,17 @@ fn build_world(
         });
 
         map.insert_tiles(tiles).unwrap();
+        map.insert_tiles(underground_tiles).unwrap();
 
-        map.spawn_chunk_containing_point(player_start).unwrap();
+        let chunk_point = map.point_to_chunk_point(player_start);
+
+        for x in chunk_point.0 - 1..=chunk_point.0 + 1 {
+            for y in chunk_point.1 - 1..=chunk_point.1 + 1 {
+                map.spawn_chunk((x, y)).expect("Chunk failed to load");
+            }
+        }
+
+        // map.spawn_chunk_containing_point(player_start).unwrap();
 
         // map.spawn_chunk((-1, 0)).unwrap();
         // map.spawn_chunk((0, 0)).unwrap();
