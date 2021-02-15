@@ -13,3 +13,8 @@ pub struct GameState {
 impl GameState {
     
 }
+#[derive(Clone)]
+pub enum AppState {
+    MainMenu,
+    InGame,
+}

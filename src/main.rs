@@ -6,7 +6,7 @@ use ui::{InventoryButtonEvent, InventoryButtonEventListenerState};
 
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
 
-use bevy_egui::EguiPlugin;
+use bevy_egui::{EguiPlugin, EguiSettings};
 
 mod ui;
 
@@ -22,6 +22,8 @@ pub mod sprite_tools;
 use sprite_tools::*;
 mod player_input;
 use player_input::*;
+
+const STAGE: &str = "app_state";
 
 pub struct Materials {
     pub wall_horizontal_material: Handle<ColorMaterial>,
@@ -45,6 +47,7 @@ fn main() -> Result<(), ()> {
             ..Default::default()
         })
         .add_resource(ClearColor(Color::BLACK))
+        .add_resource(State::new(AppState::MainMenu))
         .init_resource::<SpriteHandles>()
         .init_resource::<GameState>()
         .init_resource::<WorldMap>()
@@ -59,19 +62,12 @@ fn main() -> Result<(), ()> {
         .add_plugins(DefaultPlugins)
         .add_plugins(TilemapDefaultPlugins)
         .add_plugin(EguiPlugin)
-        .add_startup_system(setup.system())
-        .add_startup_system(world::setup.system())
-        .add_startup_system(player_input::input_setup.system())
-        .add_system(load.system())
-        .add_system(build_world.system())
-        .add_system(player::character_movement.system())
-        .add_system(ui::ui_windows.system())
-        .add_system(player_input::my_cursor_system.system())
-        .add_system(sprite_tools::sprite_change_event.system())
-        .add_system(ui::inventory_button_event.system())
+        .add_stage_after(stage::UPDATE, STAGE, StateStage::<AppState>::default())
+        .add_plugin(SetupGamePlugin)
         .add_plugin(PrintDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
+        .on_state_update(STAGE, AppState::MainMenu, ui::main_menu.system())
         .run();
 
     Ok(())
@@ -81,11 +77,53 @@ fn setup(
     commands: &mut Commands,
     mut tile_sprite_handles: ResMut<SpriteHandles>,
     asset_server: Res<AssetServer>,
+    mut egui_settings: ResMut<EguiSettings>,
 ) {
+    egui_settings.scale_factor = 1.0;
+
     tile_sprite_handles.handles = asset_server.load_folder("textures").unwrap();
     commands.insert_resource(Materials {
         wall_horizontal_material: asset_server.load("textures/buildings/wall_horizontal.png"),
     });
+}
+
+pub struct SetupGamePlugin;
+
+impl Plugin for SetupGamePlugin {
+    fn build(&self, app: &mut AppBuilder) {
+        // app.add_startup_system(setup.system())
+        //     .add_startup_system(world::setup.system())
+        //     .add_startup_system(player_input::input_setup.system())
+        //     .add_system(load.system())
+        //     .add_system(build_world.system())
+        //     .add_system(player::character_movement.system())
+        //     .add_system(ui::ui_windows.system())
+        //     .add_system(player_input::my_cursor_system.system())
+        //     .add_system(sprite_tools::sprite_change_event.system())
+        //     .add_system(ui::inventory_button_event.system())
+        //     .add_plugin(PrintDiagnosticsPlugin::default())
+        //     .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        //     .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system());
+
+        app.on_state_enter(STAGE, AppState::InGame, setup.system())
+            .on_state_enter(STAGE, AppState::InGame, world::setup.system())
+            .on_state_enter(STAGE, AppState::InGame, player_input::input_setup.system())
+            .on_state_update(STAGE, AppState::InGame, load.system())
+            .on_state_update(STAGE, AppState::InGame, build_world.system())
+            .on_state_update(STAGE, AppState::InGame, player::character_movement.system())
+            .on_state_update(STAGE, AppState::InGame, ui::ui_windows.system())
+            .on_state_update(
+                STAGE,
+                AppState::InGame,
+                player_input::my_cursor_system.system(),
+            )
+            .on_state_update(
+                STAGE,
+                AppState::InGame,
+                sprite_tools::sprite_change_event.system(),
+            )
+            .on_state_update(STAGE, AppState::InGame, ui::inventory_button_event.system());
+    }
 }
 
 fn load(

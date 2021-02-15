@@ -3,8 +3,38 @@ use bevy_egui::{egui, EguiContext, EguiSettings};
 use egui::Pos2;
 
 use super::common_components::*;
+use super::game::AppState;
 use super::player::Player;
 use super::MouseState;
+
+pub fn main_menu(
+    mut egui_context: ResMut<EguiContext>,
+    mut egui_settings: ResMut<EguiSettings>,
+    mut state: ResMut<State<AppState>>,
+) {
+    let ctx = &mut egui_context.ctx;
+
+    egui_settings.scale_factor = 3.0;
+
+    egui::CentralPanel::default().show(ctx, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.heading("Islander");
+            ui.separator();
+            if ui.button("New Game").clicked() {
+                state.set_next(AppState::InGame).unwrap();
+            };
+            if ui.button("Quit Game").clicked() {
+                std::process::exit(match super::main() {
+                    Ok(_) => 0,
+                    Err(err) => {
+                        eprintln!("error: {:?}", err);
+                        1
+                    }
+                });
+            };
+        });
+    });
+}
 
 pub fn ui_windows(
     commands: &mut Commands,
@@ -16,6 +46,7 @@ pub fn ui_windows(
     asset_server: Res<AssetServer>,
     mut q_cursor: Query<(&MouseState, Entity)>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut state: ResMut<State<AppState>>,
 ) {
     let tid: u64 = 0;
     let th = asset_server.load("textures/buildings/wall_horizontal.png");
@@ -24,7 +55,7 @@ pub fn ui_windows(
 
     for (player, pos, inventory) in q_player.iter_mut() {
         let player_name = format!("{}", player.name);
-        let pos = format!("x:{} - y:{}", pos.x, pos.y);        
+        let pos = format!("x:{} - y:{}", pos.x, pos.y);
         let health = format!("Health: {}", (player.health as i32).to_string());
         let thirst = format!("Thirst: {}", (player.thirst as i32).to_string());
         let hunger = format!("Hunger: {}", (player.hunger as i32).to_string());
@@ -68,14 +99,8 @@ pub fn ui_windows(
                     egui_settings.scale_factor -= 0.5;
                 }
 
-                if ui.button("Quit").clicked() {
-                    std::process::exit(match super::main() {
-                        Ok(_) => 0,
-                        Err(err) => {
-                            eprintln!("error: {:?}", err);
-                            1
-                        }
-                    });
+                if ui.button("Main Menu").clicked() {
+                    state.set_next(AppState::MainMenu).unwrap();
                 }
             });
 

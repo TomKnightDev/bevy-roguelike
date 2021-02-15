@@ -47,14 +47,14 @@ impl Player {
                             return true;
                         }
                         Attribute::Thirst => {
-                            if self.thirst <= 0.0 {
+                            if self.thirst <= 1.0 {
                                 return false;
                             }
                             self.thirst -= f32::min(self.thirst, e.1 as f32);
                             return true;
                         }
                         Attribute::Hunger => {
-                            if self.hunger <= 0.0 {
+                            if self.hunger <= 1.0 {
                                 return false;
                             }
                             self.hunger -= f32::min(self.hunger,e.1 as f32);

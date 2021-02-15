@@ -1,5 +1,5 @@
-use bevy::{prelude::*};
-use bevy_tilemap::{prelude::*};
+use bevy::prelude::*;
+use bevy_tilemap::prelude::*;
 
 use super::common_components::*;
 use super::game::*;
@@ -9,13 +9,7 @@ pub fn move_sprite(
     previous_position: Position,
     position: Position,
     render: &Render,
-    // camera_translation: &mut Transform,
 ) {
-    // println!(
-    //     "Previous pos - {}/{}, New pos - {}/{}",
-    //     previous_position.x, previous_position.y, position.x, position.y
-    // );
-
     // We need to first remove where we were prior.
     map.clear_tile((previous_position.x, previous_position.y), 2)
         .unwrap();
@@ -30,16 +24,23 @@ pub fn move_sprite(
 
     if chunk_point != previous_chuck_point {
         //Build list of chunks around player to render
+        let mut new_chunk_points = Vec::new();
+
         for x in chunk_point.0 - 1..=chunk_point.0 + 1 {
             for y in chunk_point.1 - 1..=chunk_point.1 + 1 {
                 map.spawn_chunk((x, y)).expect("Chunk failed to load");
+                new_chunk_points.push((x, y));
             }
         }
 
-        // map.spawn_chunk(chunk_point).unwrap();
-        // // map.spawn_chunk_containing_point((position.x, position.y))
-        // //     .unwrap();
-        // map.despawn_chunk(previous_chuck_point).unwrap();
+        //Despawn any chunks not adjacent to player
+        for x in previous_chuck_point.0 - 1..=previous_chuck_point.0 + 1 {
+            for y in previous_chuck_point.1 - 1..=previous_chuck_point.1 + 1 {
+                if !new_chunk_points.contains(&(x, y)) {
+                    map.despawn_chunk((x, y)).expect("Chunk despawn failed");
+                }
+            }
+        }
     }
 }
 
@@ -60,8 +61,6 @@ pub fn sprite_change_event(
     mut game_state: ResMut<GameState>,
 ) {
     for ev in event_listener_state.my_event_reader.iter(&events) {
-        // eprintln!("Entity {:?} leveled up!", ev.0);
-
         for mut map in query.iter_mut() {
             let texture_atlas = texture_atlases.get(map.texture_atlas()).unwrap();
             let grass_0: Handle<Texture> = asset_server.get_handle("textures/terrain/grass_0.png");
