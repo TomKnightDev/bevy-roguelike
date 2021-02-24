@@ -21,10 +21,9 @@ pub fn my_cursor_system(
     wnds: Res<Windows>,
     mut q_camera: Query<&mut Transform, With<MainCamera>>,
     world_props: Res<WorldProps>,
-    btn: Res<Input<MouseButton>>,
     mut mouse_state: ResMut<MouseState>,
     mut game_state: ResMut<GameState>,
-    mut q_player: Query<(&Player, &mut Inventory)>,
+    mut q_player: Query<(&Player, &mut Inventory, &Position)>,
     mut ev_sprite_changed: ResMut<Events<SpriteChangeEvent>>,
     mut q_cursor: Query<(&MouseState, &mut Transform, Entity)>,
     key: Res<Input<KeyCode>>,
@@ -73,10 +72,15 @@ pub fn my_cursor_system(
             );
         }
 
-        if  key.just_pressed(KeyCode::PageDown) {
+        if key.just_pressed(KeyCode::PageDown) {
             camera_transform.translation.z -= 1.0;
         } else if key.just_pressed(KeyCode::PageUp) {
             camera_transform.translation.z += 1.0;
+        }
+
+        let mut p_pos = Position::default();
+        for (_, _, pos) in q_player.iter_mut() {
+            p_pos = Position { x: pos.x, y: pos.y };
         }
 
         for ev in evr_cursor.iter(&ev_cursor) {
@@ -91,22 +95,51 @@ pub fn my_cursor_system(
             // apply the camera transform
             let pos_wld = camera_transform.compute_matrix() * p.extend(0.0).extend(1.0);
 
-            mouse_state.pos = Position {
-                x: (pos_wld.x / world_props.tile_size as f32) as i32,
-                y: (pos_wld.y / world_props.tile_size as f32) as i32,
+            //set the mouse cursor position
+            let x = if pos_wld.x as i32 / world_props.tile_size > p_pos.x {
+                p_pos.x + 1
+            } else if (pos_wld.x as i32 / world_props.tile_size) < p_pos.x {
+                p_pos.x - 1
+            } else {
+                p_pos.x
             };
 
-            for (_, mut trans, _) in &mut q_cursor.iter_mut() {
-                trans.translation = Vec3::new(
-                    (mouse_state.pos.x * world_props.tile_size) as f32 + 4.0,
-                    (mouse_state.pos.y * world_props.tile_size) as f32 + 4.0,
-                    camera_transform.translation.z - 0.5,
-                );
+            let y = if pos_wld.y as i32 / world_props.tile_size > p_pos.y {
+                p_pos.y + 1
+            } else if (pos_wld.y as i32 / world_props.tile_size) < p_pos.y {
+                p_pos.y - 1
+            } else {
+                p_pos.y
+            };
+
+            if x != p_pos.x || y != p_pos.y {
+                mouse_state.pos = Position { x: x, y: y };
+
+                for (_, mut trans, _) in &mut q_cursor.iter_mut() {
+                    trans.translation = Vec3::new(
+                        (mouse_state.pos.x * world_props.tile_size) as f32 + 4.0,
+                        (mouse_state.pos.y * world_props.tile_size) as f32 + 4.0,
+                        camera_transform.translation.z - 0.5,
+                    );
+                }
             }
+            // mouse_state.pos = Position {
+            //     x: (pos_wld.x / world_props.tile_size as f32) as i32,
+            //     y: (pos_wld.y / world_props.tile_size as f32) as i32,
+            // };
+
+            // for (_, mut trans, _) in &mut q_cursor.iter_mut() {
+            //     trans.translation = Vec3::new(
+            //         (mouse_state.pos.x * world_props.tile_size) as f32 + 4.0,
+            //         (mouse_state.pos.y * world_props.tile_size) as f32 + 4.0,
+            //         camera_transform.translation.z - 0.5,
+            //     );
+            // }
         }
     }
 
-    if btn.just_pressed(MouseButton::Left) {
+    // if btn.just_pressed(MouseButton::Left) {
+    if key.just_pressed(KeyCode::F) {
         println!("World coords: {}/{}", mouse_state.pos.x, mouse_state.pos.y);
 
         //Harvestable
@@ -121,7 +154,7 @@ pub fn my_cursor_system(
             let i = hi.items.iter().next().unwrap();
             let pos = hi.pos;
 
-            for (_, mut inventory) in q_player.iter_mut() {
+            for (_, mut inventory, _) in q_player.iter_mut() {
                 // inventory.items.keys().filter(|item| item == i);
 
                 if inventory.items.contains_key(i) {

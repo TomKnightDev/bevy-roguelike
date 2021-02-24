@@ -4,7 +4,7 @@ use sprite_tools::SpriteChangeEvent;
 use std::collections::HashMap;
 use ui::{InventoryButtonEvent, InventoryButtonEventListenerState};
 
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
+// use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
 
 use bevy_egui::{EguiPlugin, EguiSettings};
 
@@ -64,9 +64,9 @@ fn main() -> Result<(), ()> {
         .add_plugin(EguiPlugin)
         .add_stage_after(stage::UPDATE, STAGE, StateStage::<AppState>::default())
         .add_plugin(SetupGamePlugin)
-        .add_plugin(PrintDiagnosticsPlugin::default())
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
+        // .add_plugin(PrintDiagnosticsPlugin::default())
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        // .add_system(PrintDiagnosticsPlugin::print_diagnostics_system.system())
         .on_state_update(STAGE, AppState::MainMenu, ui::main_menu.system())
         .run();
 
@@ -188,8 +188,8 @@ fn load(
             .spawn(Camera2dBundle {
                 transform: Transform {
                     translation: Vec3::new(
-                        0.0, //500 as f32 * worldprops.tile_size as f32,
-                        0.0, //500 as f32 * worldprops.tile_size as f32,
+                        (worldprops.tilemap_width as f32 / 2.0) * worldprops.tile_size as f32,
+                        (worldprops.tilemap_height as f32 / 2.0) * worldprops.tile_size as f32,
                         15.0,
                     ),
                     rotation: Quat::identity(),
@@ -318,7 +318,7 @@ fn build_world(
         player_tile.z_order = 2;
         tiles.push(player_tile);
 
-        let player_start = (0, 0); //(worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
+        let player_start = (worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
 
         commands.spawn(PlayerBundle {
             player: Player {

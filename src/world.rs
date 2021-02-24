@@ -38,14 +38,9 @@ pub struct WorldMap {
     pub tiles: Vec<Vec<i64>>,
 }
 
-pub fn setup(
-    mut world_map: ResMut<WorldMap>,
-    mut world: ResMut<WorldProps>,
-) {
+pub fn setup(mut world_map: ResMut<WorldMap>, mut world: ResMut<WorldProps>) {
     world.chunk_width = 50;
     world.chunk_height = 50;
-    world.tilemap_width = 1000;
-    world.tilemap_height = 1000;
     world.tile_size = 8;
 
     //Get world map
@@ -55,8 +50,11 @@ pub fn setup(
     let mut json_map: serde_json::Value =
         serde_json::from_reader(reader).expect("Read of json file failed");
 
-    world_map.height = json_map["height"].as_i64().unwrap();
-    world_map.width = json_map["width"].as_i64().unwrap();
+    world_map.height = json_map["height"].as_i64().expect("Height failed");
+    world_map.width = json_map["width"].as_i64().expect("Width failed");
+
+    world.tilemap_height = world_map.height as i32;
+    world.tilemap_width = world_map.width as i32;
 
     let layer_0_data = json_map["layers"][0]
         .get_mut("data")
@@ -70,7 +68,11 @@ pub fn setup(
     for _ in (0..world_map.width).rev() {
         world_map.tiles.push(Vec::new());
         for y in (0..world_map.height).rev() {
-            world_map.tiles[count as usize].push(layer_0_data[((height * y) + count) as usize].as_i64().unwrap());
+            world_map.tiles[count as usize].push(
+                layer_0_data[((height * y) + count) as usize]
+                    .as_i64()
+                    .unwrap(),
+            );
         }
 
         count += 1;
