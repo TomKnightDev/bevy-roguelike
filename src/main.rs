@@ -24,6 +24,7 @@ mod player_input;
 use player_input::*;
 
 const STAGE: &str = "app_state";
+const TURN_SPEED: f32 = 0.2;
 
 pub struct Materials {
     pub wall_horizontal_material: Handle<ColorMaterial>,
@@ -201,7 +202,7 @@ fn load(
 
         commands
             .spawn(tilemap_components)
-            .with(Timer::from_seconds(0.1, true));
+            .with(Timer::from_seconds(TURN_SPEED, true));
 
         sprite_handles.atlas_loaded = true;
     }
