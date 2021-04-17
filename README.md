@@ -1,6 +1,6 @@
 # Islander
 
-The beginnings of a rougelike game made entirely using the Rust programming language, using the bevy game engine.
+The beginnings of a rougelike written in the Rust programming language, using the bevy game engine.
 
 Mechanics implemented...
 
