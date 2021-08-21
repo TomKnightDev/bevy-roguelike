@@ -227,9 +227,10 @@ pub fn try_move_player(
     collisions: &HashSet<(i32, i32)>,
 ) {
     let new_pos = (position.x + delta_xy.0, position.y + delta_xy.1);
-    // if !collisions.contains(&new_pos)
-    //     && 
-        if new_pos.0 >= 0
+    if !collisions.contains(&new_pos)
+        && 
+        // if 
+        new_pos.0 >= 0
         && new_pos.0 < tilemap_width
         && new_pos.1 >= 0
         && new_pos.1 < tilemap_height

@@ -127,6 +127,39 @@ impl Plugin for SetupGamePlugin {
     }
 }
 
+fn load_camera(commands: &mut Commands, sprite_handles: ResMut<SpriteHandles>,
+    mut player_query: Query<(&mut Position, &Render, &mut Player)>,
+) {
+    if sprite_handles.atlas_loaded {
+        return;
+    }
+
+    let mut pos = (0,0);
+    for pq in player_query.iter_mut() {
+        pos = (pq.0.x, pq.0.y);
+    }
+
+    println!("Camera pos {:?}", pos);
+
+    commands
+    .spawn(Camera2dBundle {
+        transform: Transform {
+            translation: Vec3::new(
+                pos.0 as f32,
+                pos.1 as f32,
+                // (worldprops.tilemap_width as f32 / 2.0) * worldprops.tile_size as f32,
+                // (worldprops.tilemap_height as f32 / 2.0) * worldprops.tile_size as f32,
+                15.0,
+            ),
+            rotation: Quat::identity(),
+            scale: Vec3::new(0.2, 0.2, 1.0),
+        },
+        ..Default::default()
+    })
+    .with(player_input::MainCamera);
+
+}
+
 fn load(
     commands: &mut Commands,
     mut sprite_handles: ResMut<SpriteHandles>,
@@ -185,21 +218,7 @@ fn load(
             global_transform: Default::default(),
         };
 
-        commands
-            .spawn(Camera2dBundle {
-                transform: Transform {
-                    translation: Vec3::new(
-                        (worldprops.tilemap_width as f32 / 2.0) * worldprops.tile_size as f32,
-                        (worldprops.tilemap_height as f32 / 2.0) * worldprops.tile_size as f32,
-                        15.0,
-                    ),
-                    rotation: Quat::identity(),
-                    scale: Vec3::new(0.2, 0.2, 1.0),
-                },
-                ..Default::default()
-            })
-            .with(player_input::MainCamera);
-
+        
         commands
             .spawn(tilemap_components)
             .with(Timer::from_seconds(TURN_SPEED, true));
@@ -251,6 +270,8 @@ fn build_world(
 
         let mut tiles = Vec::new();
         let mut underground_tiles = Vec::new();
+        let mut possible_starting_locations = Vec::new();
+
         for x in 0..worldprops.tilemap_width {
             for y in 0..worldprops.tilemap_height {
                 let mut tile = Tile::new((x, y), grass_0_index);
@@ -281,6 +302,9 @@ fn build_world(
                         };
                         game_state.harvestable_tiles.push(h)
                     }
+                }
+                else {
+                    possible_starting_locations.push((x,y));
                 }
 
                 match tile_index {
@@ -319,7 +343,9 @@ fn build_world(
         player_tile.z_order = 2;
         tiles.push(player_tile);
 
-        let player_start = (worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
+        // let mut player_start = (worldprops.tilemap_width / 2, worldprops.tilemap_height / 2);
+
+        let mut player_start = possible_starting_locations[100000];
 
         commands.spawn(PlayerBundle {
             player: Player {
@@ -342,6 +368,23 @@ fn build_world(
                 items: HashMap::new(),
             },
         });
+
+        commands
+        .spawn(Camera2dBundle {
+        transform: Transform {
+            translation: Vec3::new(
+                player_start.0 as f32 * worldprops.tile_size as f32,
+                player_start.1 as f32 * worldprops.tile_size as f32,
+                // (worldprops.tilemap_width as f32 / 2.0) * worldprops.tile_size as f32,
+                // (worldprops.tilemap_height as f32 / 2.0) * worldprops.tile_size as f32,
+                15.0,
+            ),
+            rotation: Quat::identity(),
+            scale: Vec3::new(0.2, 0.2, 1.0),
+        },
+        ..Default::default()
+    })
+    .with(player_input::MainCamera);
 
         map.insert_tiles(tiles).unwrap();
         map.insert_tiles(underground_tiles).unwrap();
